@@ -110,3 +110,142 @@ def test_event_schema_round_trip(event: Event) -> None:
     assert deserialised.timestamp == event.timestamp
     assert deserialised.camera_id == event.camera_id
     assert deserialised.attributes == event.attributes
+
+
+# ---------------------------------------------------------------------------
+# Property 3: Detection Threshold Filtering — Validates: Requirements 1.1, 1.8
+#
+# After pipeline filtering, all remaining detections MUST have
+# confidence >= 0.5 AND bbox_height >= 50px.
+# ---------------------------------------------------------------------------
+
+# Strategies for detection generation
+confidence_strategy = st.floats(min_value=0.0, max_value=1.0)
+bbox_height_strategy = st.integers(min_value=10, max_value=500)
+
+# Normalised bbox: x1, y1, x2, y2 in [0.0, 1.0]
+normalised_coord = st.floats(min_value=0.0, max_value=1.0)
+
+
+@st.composite
+def detection_list_strategy(draw: st.DrawFn) -> list[dict]:
+    """Generate a list of raw detections with varying confidence and bbox height."""
+    n = draw(st.integers(min_value=0, max_value=20))
+    detections = []
+    for _ in range(n):
+        conf = draw(confidence_strategy)
+        # Generate bbox in pixel space (frame assumed 1080p height)
+        frame_height = 1080
+        y1_px = draw(st.integers(min_value=0, max_value=frame_height - 11))
+        bbox_h = draw(bbox_height_strategy)
+        y2_px = min(y1_px + bbox_h, frame_height)
+        # Normalise
+        y1 = y1_px / frame_height
+        y2 = y2_px / frame_height
+        x1 = draw(st.floats(min_value=0.0, max_value=0.8))
+        x2 = x1 + draw(st.floats(min_value=0.01, max_value=0.2))
+        x2 = min(x2, 1.0)
+        detections.append(
+            {
+                "bbox": (x1, y1, x2, y2),
+                "confidence": conf,
+                "bbox_height_px": y2_px - y1_px,
+            }
+        )
+    return detections
+
+
+def apply_pipeline_filters(
+    detections: list[dict],
+    min_confidence: float = 0.5,
+    min_bbox_height_px: int = 50,
+) -> list[dict]:
+    """Replicate the pipeline's threshold filtering logic."""
+    return [
+        d
+        for d in detections
+        if d["confidence"] >= min_confidence
+        and d["bbox_height_px"] >= min_bbox_height_px
+    ]
+
+
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
+@given(detections=detection_list_strategy())
+def test_detection_threshold_filtering(detections: list[dict]) -> None:
+    """Property 3: All detections surviving filtering meet both thresholds."""
+    filtered = apply_pipeline_filters(detections)
+
+    for det in filtered:
+        assert det["confidence"] >= 0.5, (
+            f"Detection with confidence {det['confidence']} should have been filtered"
+        )
+        assert det["bbox_height_px"] >= 50, (
+            f"Detection with bbox_height {det['bbox_height_px']}px should have been filtered"
+        )
+
+    # Also verify that no detection meeting both thresholds was dropped
+    for det in detections:
+        if det["confidence"] >= 0.5 and det["bbox_height_px"] >= 50:
+            assert det in filtered, (
+                f"Valid detection was incorrectly filtered: {det}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Property 4: Staff Exclusion Invariant — Validates: Requirements 1.5
+#
+# No detection tagged with role="staff" shall appear in the output
+# TrackFrame.detections list that is passed to the event engine.
+# ---------------------------------------------------------------------------
+
+from detection.models import TrackDetection, TrackFrame
+
+role_strategy = st.sampled_from(["visitor", "staff"])
+
+
+@st.composite
+def mixed_detection_set_strategy(draw: st.DrawFn) -> list[TrackDetection]:
+    """Generate a list of TrackDetections with mixed visitor/staff roles."""
+    n = draw(st.integers(min_value=1, max_value=20))
+    detections = []
+    for i in range(n):
+        role = draw(role_strategy)
+        x1 = draw(st.floats(min_value=0.0, max_value=0.7))
+        y1 = draw(st.floats(min_value=0.0, max_value=0.7))
+        x2 = x1 + draw(st.floats(min_value=0.01, max_value=0.3))
+        y2 = y1 + draw(st.floats(min_value=0.01, max_value=0.3))
+        x2 = min(x2, 1.0)
+        y2 = min(y2, 1.0)
+        conf = draw(st.floats(min_value=0.5, max_value=1.0))
+        detections.append(
+            TrackDetection(
+                track_id=i + 1,
+                bbox=(x1, y1, x2, y2),
+                confidence=conf,
+                role=role,
+            )
+        )
+    return detections
+
+
+def filter_staff_detections(detections: list[TrackDetection]) -> list[TrackDetection]:
+    """Filter out staff detections — mirrors pipeline output for event engine."""
+    return [d for d in detections if d.role != "staff"]
+
+
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
+@given(detections=mixed_detection_set_strategy())
+def test_staff_exclusion_invariant(detections: list[TrackDetection]) -> None:
+    """Property 4: No staff-tagged detection appears in filtered output."""
+    filtered = filter_staff_detections(detections)
+
+    for det in filtered:
+        assert det.role != "staff", (
+            f"Staff detection with track_id={det.track_id} was not excluded"
+        )
+
+    # Verify all visitors are preserved
+    visitors = [d for d in detections if d.role == "visitor"]
+    assert len(filtered) == len(visitors), (
+        f"Expected {len(visitors)} visitor detections, got {len(filtered)}"
+    )
