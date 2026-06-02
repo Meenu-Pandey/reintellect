@@ -12,11 +12,19 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from db.database import Database
+from db.event_consumer import event_consumer
 from detection.demo_source import DemoVideoSource
 from detection.pipeline import DetectionPipeline
 from engine.event_engine import EventEngine
 
 logger = logging.getLogger(__name__)
+
+# Default database path
+DEFAULT_DB_PATH = os.environ.get(
+    "DB_PATH",
+    str(Path(__file__).resolve().parent.parent / "data" / "reintellect.db"),
+)
 
 
 def _build_pipeline_config() -> dict:
@@ -46,7 +54,7 @@ def _build_pipeline_config() -> dict:
 def _build_store_layout() -> dict:
     """Build store layout from environment or defaults.
 
-    In production, this is loaded from the database (Phase 5).
+    In production, this is loaded from the database.
     For now, use a default layout based on the Purplle store CAM3 entrance.
     """
     return {
@@ -111,8 +119,20 @@ async def lifespan(app: FastAPI):
     app.state.track_queue = track_queue
     app.state.event_queue = event_queue
 
-    # Database connection placeholder (implemented in Phase 5)
-    app.state.db = None
+    # --- Database ---
+    db: Database | None = None
+    db_path = DEFAULT_DB_PATH
+    if Path(db_path).exists():
+        db = Database()
+        await db.connect(db_path)
+        logger.info("Database connected: %s", db_path)
+    else:
+        logger.warning(
+            "Database not found at %s — run 'python -m db.init_schema' first. "
+            "Events will not be persisted.",
+            db_path,
+        )
+    app.state.db = db
 
     # --- DetectionPipeline ---
     pipeline_task: asyncio.Task | None = None
@@ -134,12 +154,18 @@ async def lifespan(app: FastAPI):
         app.state.pipeline_task = None
 
     # --- EventEngine ---
-    engine_task: asyncio.Task | None = None
     store_layout = _build_store_layout()
     engine = EventEngine(track_queue, event_queue, store_layout)
     engine_task = asyncio.create_task(engine.run())
     app.state.engine_task = engine_task
     logger.info("EventEngine started")
+
+    # --- Event Consumer ---
+    consumer_task = asyncio.create_task(
+        event_consumer(event_queue, db, ws_manager=None)
+    )
+    app.state.consumer_task = consumer_task
+    logger.info("event_consumer started")
 
     logger.info("ReIntellect backend ready")
 
@@ -148,6 +174,15 @@ async def lifespan(app: FastAPI):
     # --- Shutdown ---
     logger.info("ReIntellect backend shutting down")
 
+    # Cancel consumer first (downstream)
+    if consumer_task is not None and not consumer_task.done():
+        consumer_task.cancel()
+        try:
+            await consumer_task
+        except asyncio.CancelledError:
+            logger.info("event_consumer task cancelled")
+
+    # Cancel engine
     if engine_task is not None and not engine_task.done():
         engine_task.cancel()
         try:
@@ -155,12 +190,17 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             logger.info("EventEngine task cancelled")
 
+    # Cancel pipeline
     if pipeline_task is not None and not pipeline_task.done():
         pipeline_task.cancel()
         try:
             await pipeline_task
         except asyncio.CancelledError:
             logger.info("DetectionPipeline task cancelled")
+
+    # Close database
+    if db is not None:
+        await db.close()
 
     logger.info("ReIntellect backend stopped")
 
