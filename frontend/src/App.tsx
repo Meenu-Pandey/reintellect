@@ -3,11 +3,16 @@
  *
  * Renders StoreSelector, tab navigation, active screen,
  * live event feed, and WebSocket reconnect indicator.
+ *
+ * Responsive layout: 1280px–2560px, no horizontal overflow.
  */
 
 import { useEffect, useState } from "react";
 import { StoreSelector } from "./components/StoreSelector";
 import { OverviewScreen } from "./components/Overview/OverviewScreen";
+import { FunnelScreen } from "./components/Funnel/FunnelScreen";
+import { HeatmapScreen } from "./components/Heatmap/HeatmapScreen";
+import { AnomaliesScreen } from "./components/Anomalies/AnomaliesScreen";
 import { LiveFeedPanel } from "./components/LiveFeed/LiveFeedPanel";
 import { ReconnectBanner } from "./components/ReconnectBanner";
 import { useWebSocketStore } from "./store/websocket";
@@ -33,17 +38,43 @@ function App() {
   ];
 
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif", padding: "1rem" }}>
+    <div
+      style={{
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        padding: "1rem",
+        maxWidth: "2560px",
+        margin: "0 auto",
+        boxSizing: "border-box",
+        overflow: "hidden",
+      }}
+    >
       <ReconnectBanner />
 
-      <header style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
-        <h1 style={{ margin: 0, fontSize: "1.5rem" }}>ReIntellect</h1>
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "1rem",
+          marginBottom: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <h1 style={{ margin: 0, fontSize: "1.5rem", whiteSpace: "nowrap" }}>
+          ReIntellect
+        </h1>
         <StoreSelector selectedStoreId={storeId} onSelect={setStoreId} />
       </header>
 
       {storeId && (
         <>
-          <nav style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+          <nav
+            style={{
+              display: "flex",
+              gap: "0.5rem",
+              marginBottom: "1rem",
+              flexWrap: "wrap",
+            }}
+          >
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -55,6 +86,7 @@ function App() {
                   background: activeTab === tab.id ? "#333" : "#fff",
                   color: activeTab === tab.id ? "#fff" : "#333",
                   cursor: "pointer",
+                  fontSize: "0.85rem",
                 }}
               >
                 {tab.label}
@@ -62,29 +94,27 @@ function App() {
             ))}
           </nav>
 
-          <main style={{ display: "flex", gap: "1rem" }}>
-            <section style={{ flex: 1 }}>
+          <main
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr minmax(280px, 320px)",
+              gap: "1rem",
+              minWidth: 0,
+            }}
+          >
+            <section style={{ minWidth: 0, overflow: "hidden" }}>
               {activeTab === "overview" && <OverviewScreen storeId={storeId} />}
-              {activeTab === "funnel" && <PlaceholderScreen name="Funnel" />}
-              {activeTab === "heatmap" && <PlaceholderScreen name="Heatmap" />}
-              {activeTab === "anomalies" && <PlaceholderScreen name="Anomalies" />}
+              {activeTab === "funnel" && <FunnelScreen storeId={storeId} />}
+              {activeTab === "heatmap" && <HeatmapScreen storeId={storeId} />}
+              {activeTab === "anomalies" && <AnomaliesScreen storeId={storeId} />}
             </section>
 
-            <aside style={{ width: "320px" }}>
+            <aside style={{ minWidth: 0 }}>
               <LiveFeedPanel />
             </aside>
           </main>
         </>
       )}
-    </div>
-  );
-}
-
-/** Placeholder for screens not yet implemented (7.6, 7.7, 7.8). */
-function PlaceholderScreen({ name }: { name: string }) {
-  return (
-    <div style={{ padding: "2rem", textAlign: "center", color: "#888" }}>
-      {name} screen — not yet implemented
     </div>
   );
 }
