@@ -1,110 +1,59 @@
-/**
- * Funnel screen.
- *
- * Renders a Recharts BarChart with zone names on X-axis and visitor_count on Y-axis.
- * Shows drop-off rate between stages as percentage labels.
- * Uses useFunnel hook with 30s auto-refresh.
- */
-
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from "recharts";
+import { motion } from "framer-motion";
+import { theme } from "../../styles/theme";
 import { useFunnel } from "../../api/hooks/useFunnel";
 
-interface Props {
-  storeId: string;
-}
+interface Props { storeId: string; }
 
 export function FunnelScreen({ storeId }: Props) {
-  const { data, isLoading, error } = useFunnel(storeId);
+  const { data, isLoading } = useFunnel(storeId);
 
-  if (isLoading) {
-    return <LoadingSkeleton />;
-  }
+  if (isLoading) return <div style={{ padding: "2rem", textAlign: "center", color: theme.text.muted }}>Loading funnel...</div>;
+  if (!data?.data_available) return <div style={{ padding: "2rem", textAlign: "center", color: theme.text.muted }}>No funnel data available.</div>;
 
-  if (error) {
-    return <div style={{ color: "#dc2626" }}>Failed to load funnel data.</div>;
-  }
-
-  if (!data || !data.data_available || data.stages.length === 0) {
-    return (
-      <div style={{ padding: "2rem", textAlign: "center", color: "#888" }}>
-        No funnel data available yet.
-      </div>
-    );
-  }
-
-  const stages = data.stages;
-  const chartData = stages.map((stage, i) => {
-    const prev = i > 0 ? stages[i - 1].visitor_count : data.total_visitors;
-    const dropOff = prev > 0 ? ((prev - stage.visitor_count) / prev) * 100 : 0;
-    return {
-      name: stage.zone_name,
-      visitors: stage.visitor_count,
-      dropOff: Math.round(dropOff),
-      entryRate: (stage.entry_rate * 100).toFixed(1),
-    };
-  });
-
-  const colors = ["#3b82f6", "#8b5cf6", "#06b6d4", "#f59e0b", "#22c55e", "#ec4899"];
+  const total = data.total_visitors;
+  const stages = [{ name: "Store Entry", count: total, zone_id: "_entry" }, ...data.stages.map(s => ({ name: s.zone_name.replace("ZONE_", ""), count: s.visitor_count, zone_id: s.zone_id }))];
+  const max = stages[0].count;
 
   return (
-    <div>
-      <h2 style={{ fontSize: "1.1rem", marginBottom: "1rem" }}>Visitor Funnel</h2>
-      <ResponsiveContainer width="100%" height={350}>
-        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis
-            dataKey="name"
-            angle={-30}
-            textAnchor="end"
-            height={80}
-            fontSize={12}
-          />
-          <YAxis label={{ value: "Visitors", angle: -90, position: "insideLeft" }} />
-          <Tooltip
-            content={({ payload, active }) => {
-              if (!active || !payload || !payload.length) return null;
-              const d = payload[0].payload as { name: string; visitors: number; dropOff: number; entryRate: string };
-              return (
-                <div style={{ background: "#fff", border: "1px solid #ccc", padding: "0.5rem", borderRadius: "4px", fontSize: "0.8rem" }}>
-                  <div style={{ fontWeight: 600 }}>{d.name}</div>
-                  <div>{d.visitors} visitors</div>
-                  <div>Drop-off: {d.dropOff}%</div>
-                  <div>Entry rate: {d.entryRate}%</div>
+    <div style={{ background: theme.bg.card, border: `1px solid ${theme.border}`, borderRadius: theme.radius, padding: "1.25rem" }}>
+      <div style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.25rem" }}>Customer Journey Funnel</div>
+      <div style={{ fontSize: "0.75rem", color: theme.text.muted, marginBottom: "1.25rem" }}>Visitor progression through store zones</div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+        {stages.map((s, i) => {
+          const pct = max > 0 ? (s.count / max) * 100 : 0;
+          const prev = i > 0 ? stages[i - 1].count : s.count;
+          const drop = prev > 0 ? Math.round(((prev - s.count) / prev) * 100) : 0;
+          const isLast = i === stages.length - 1;
+
+          return (
+            <div key={s.zone_id}>
+              {i > 0 && drop > 0 && (
+                <div style={{ padding: "0.15rem 0 0.15rem 1rem", fontSize: "0.72rem", color: theme.accent.red }}>↓ {drop}% drop-off</div>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                <div style={{ flex: 1, height: 36, background: theme.bg.elevated, borderRadius: theme.radiusXs, position: "relative", overflow: "hidden" }}>
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.6, delay: i * 0.08 }}
+                    style={{ height: "100%", background: isLast ? theme.accent.green : `rgba(123,31,162,${0.9 - i * 0.12})`, borderRadius: theme.radiusXs }}
+                  />
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0.7rem" }}>
+                    <span style={{ fontSize: "0.82rem", fontWeight: 500, zIndex: 1 }}>{s.name}</span>
+                    <span style={{ fontSize: "0.82rem", fontWeight: 700, zIndex: 1 }}>{s.count}</span>
+                  </div>
                 </div>
-              );
-            }}
-          />
-          <Bar dataKey="visitors" radius={[4, 4, 0, 0]}>
-            {chartData.map((_entry, index) => (
-              <Cell key={index} fill={colors[index % colors.length]} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-
-      <div style={{ marginTop: "1rem", fontSize: "0.8rem", color: "#666" }}>
-        {chartData.map((d, i) => (
-          <span key={i} style={{ marginRight: "1.5rem" }}>
-            {d.name}: {d.visitors} visitors
-            {i > 0 && <span style={{ color: "#dc2626" }}> (↓{d.dropOff}%)</span>}
-          </span>
-        ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </div>
-  );
-}
 
-function LoadingSkeleton() {
-  return (
-    <div style={{ padding: "2rem" }}>
-      <div
-        style={{
-          height: "350px",
-          background: "#f3f4f6",
-          borderRadius: "8px",
-          animation: "pulse 1.5s infinite",
-        }}
-      />
+      <div style={{ marginTop: "1rem", padding: "0.6rem 0.75rem", background: theme.bg.elevated, borderRadius: theme.radiusXs, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: "0.8rem", color: theme.text.secondary }}>End-to-end conversion</span>
+        <span style={{ fontSize: "0.9rem", fontWeight: 700, color: theme.accent.green }}>{total > 0 ? ((stages[stages.length - 1].count / total) * 100).toFixed(1) : 0}%</span>
+      </div>
     </div>
   );
 }

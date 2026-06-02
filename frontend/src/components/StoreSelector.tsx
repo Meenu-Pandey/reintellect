@@ -1,9 +1,9 @@
 /**
- * Store selector dropdown.
- * Fetches store list from the backend and allows selection.
+ * Store selector dropdown — dark themed.
  */
 
 import { useEffect, useState } from "react";
+import { theme } from "../styles/theme";
 import client from "../api/client";
 
 interface Store {
@@ -18,51 +18,42 @@ interface Props {
 
 export function StoreSelector({ selectedStoreId, onSelect }: Props) {
   const [stores, setStores] = useState<Store[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     client
-      .get<{ stores: Store[] } | Store[]>("/stores")
+      .get("/stores")
       .then((res) => {
         const data = res.data;
-        // Handle both array and object response shapes
-        const list = Array.isArray(data) ? data : (data as { stores: Store[] }).stores || [];
+        const list = Array.isArray(data) ? data : data?.stores || [];
         setStores(list);
-        // Auto-select first store if nothing selected
-        if (!selectedStoreId && list.length > 0) {
-          onSelect(list[0].store_id);
-        }
+        if (!selectedStoreId && list.length > 0) onSelect(list[0].store_id);
       })
       .catch(() => {
-        // If endpoint doesn't exist yet, provide a default
-        const fallback: Store[] = [
-          { store_id: "purplle-brigade-road", name: "Purplle Brigade Road" },
-        ];
+        const fallback = [{ store_id: "purplle-brigade-road", name: "Purplle Brigade Road" }];
         setStores(fallback);
-        if (!selectedStoreId) {
-          onSelect(fallback[0].store_id);
-        }
-      })
-      .finally(() => setLoading(false));
+        if (!selectedStoreId) onSelect(fallback[0].store_id);
+      });
   }, []);
-
-  if (loading) {
-    return <span>Loading stores...</span>;
-  }
 
   return (
     <select
       value={selectedStoreId || ""}
       onChange={(e) => onSelect(e.target.value)}
       aria-label="Select store"
+      style={{
+        padding: "0.4rem 0.75rem",
+        background: theme.bg.elevated,
+        border: `1px solid ${theme.border}`,
+        borderRadius: theme.radiusSm,
+        color: theme.text.primary,
+        fontSize: "0.78rem",
+        cursor: "pointer",
+        outline: "none",
+      }}
     >
-      <option value="" disabled>
-        Select a store
-      </option>
+      <option value="" disabled>Select store</option>
       {stores.map((s) => (
-        <option key={s.store_id} value={s.store_id}>
-          {s.name}
-        </option>
+        <option key={s.store_id} value={s.store_id}>{s.name}</option>
       ))}
     </select>
   );
