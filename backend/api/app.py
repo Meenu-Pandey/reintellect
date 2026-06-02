@@ -21,7 +21,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
-from api.routers import health, schema
+from api.routers import health, schema, stores, events
 
 logger = logging.getLogger(__name__)
 
@@ -93,3 +93,5 @@ def create_api_app(app: FastAPI) -> None:
     # --- Routers ---
     app.include_router(health.router)
     app.include_router(schema.router)
+    app.include_router(stores.router)
+    app.include_router(events.router)
