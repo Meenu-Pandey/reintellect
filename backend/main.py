@@ -13,6 +13,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from api.app import create_api_app
+from api.websocket.manager import ConnectionManager
 from db.database import Database
 from db.event_consumer import event_consumer
 from detection.demo_source import DemoVideoSource
@@ -161,9 +162,14 @@ async def lifespan(app: FastAPI):
     app.state.engine_task = engine_task
     logger.info("EventEngine started")
 
+    # --- WebSocket ConnectionManager ---
+    ws_manager = ConnectionManager()
+    app.state.ws_manager = ws_manager
+    logger.info("ConnectionManager initialised")
+
     # --- Event Consumer ---
     consumer_task = asyncio.create_task(
-        event_consumer(event_queue, db, ws_manager=None)
+        event_consumer(event_queue, db, ws_manager=ws_manager)
     )
     app.state.consumer_task = consumer_task
     logger.info("event_consumer started")

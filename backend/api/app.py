@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from api.routers import health, schema, stores, events, metrics, funnel, heatmap, anomalies
+from api.websocket.router import router as ws_router
 
 logger = logging.getLogger(__name__)
 
@@ -99,3 +100,4 @@ def create_api_app(app: FastAPI) -> None:
     app.include_router(funnel.router)
     app.include_router(heatmap.router)
     app.include_router(anomalies.router)
+    app.include_router(ws_router)
