@@ -74,7 +74,7 @@ class DemoVideoSource:
 
     def release(self) -> None:
         """Release the underlying VideoCapture resource."""
-        if self._cap is not None:
+        if getattr(self, "_cap", None) is not None:
             self._cap.release()
 
     def __del__(self) -> None:
