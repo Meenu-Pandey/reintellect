@@ -12,6 +12,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from api.app import create_api_app
 from db.database import Database
 from db.event_consumer import event_consumer
 from detection.demo_source import DemoVideoSource
@@ -213,6 +214,8 @@ def create_app() -> FastAPI:
         description="AI-powered Store Intelligence Platform",
         lifespan=lifespan,
     )
+    # Wire in middleware and routers
+    create_api_app(application)
     return application
 
 
