@@ -70,3 +70,46 @@ def test_zone_dwell_threshold(dwell_seconds: float) -> None:
             f"Expected no ZONE_DWELL for {dwell_seconds}s dwell, "
             f"got {len(dwell_events)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Property 7: Queue Position Monotonicity — Validates: Requirements 2.6
+#
+# Each queue_position = prior_depth + 1 and queue_position >= 1.
+# ---------------------------------------------------------------------------
+
+from engine.queue_tracker import QueueTracker
+
+
+@st.composite
+def queue_join_sequence_strategy(draw: st.DrawFn) -> list[str]:
+    """Generate a sequence of unique visitor_ids joining a queue."""
+    n = draw(st.integers(min_value=1, max_value=50))
+    visitor_ids = [f"visitor-{i}" for i in range(n)]
+    return visitor_ids
+
+
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
+@given(visitor_ids=queue_join_sequence_strategy())
+def test_queue_position_monotonicity(visitor_ids: list[str]) -> None:
+    """Property 7: Each queue_position = prior_depth + 1 and >= 1."""
+    tracker = QueueTracker(store_id="store-1", camera_id="CAM1")
+    t = BASE_TIME
+
+    prior_depth = 0
+    for i, vid in enumerate(visitor_ids):
+        event = tracker.join(vid, t + timedelta(seconds=i))
+        pos = event.attributes["queue_position"]
+
+        # queue_position must equal prior_depth + 1
+        assert pos == prior_depth + 1, (
+            f"Expected queue_position={prior_depth + 1}, got {pos} "
+            f"(joiner #{i}, visitor={vid})"
+        )
+
+        # queue_position must be >= 1
+        assert pos >= 1, (
+            f"queue_position must be >= 1, got {pos}"
+        )
+
+        prior_depth = tracker.get_depth()
