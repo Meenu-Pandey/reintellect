@@ -9,13 +9,13 @@ Tests:
 """
 
 import os
-import sqlite3
 import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+from tests.conftest import _apply_schema
 
 
 @pytest.fixture(scope="module")
@@ -26,29 +26,20 @@ def ws_app():
     db_path = db_file.name
     db_file.close()
 
+    # Apply schema FIRST
+    _apply_schema(db_path)
+
     os.environ["DB_PATH"] = db_path
     os.environ["VIDEO_SOURCE"] = "none"
 
-    # Init schema and seed store
-    migration_path = (
-        Path(__file__).resolve().parent.parent.parent
-        / "db"
-        / "migrations"
-        / "001_initial.sql"
-    )
-    conn = sqlite3.connect(db_path)
-    conn.executescript(migration_path.read_text())
-    conn.execute(
-        "INSERT INTO stores (store_id, name, timezone) VALUES (?, ?, ?)",
-        ("test-store", "Test Store", "UTC"),
-    )
-    conn.commit()
-    conn.close()
-
-    from main import create_app
-
-    app = create_app()
+    import importlib
+    import main as main_module
+    importlib.reload(main_module)
+    app = main_module.create_app()
     yield app
+
+    os.environ.pop("DB_PATH", None)
+    os.environ.pop("VIDEO_SOURCE", None)
 
     try:
         os.unlink(db_path)

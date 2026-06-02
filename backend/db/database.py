@@ -15,6 +15,7 @@ from typing import Any
 import aiosqlite
 
 from engine.models import Event
+from engine.anomaly_detector import Anomaly
 
 logger = logging.getLogger(__name__)
 
@@ -243,3 +244,31 @@ class Database:
 
         await self._conn.commit()
         logger.info("Store layout upserted: %s", store_id)
+
+    async def insert_anomaly(self, anomaly: Anomaly, store_id: str) -> None:
+        """Insert a detected anomaly into the anomalies table.
+
+        Args:
+            anomaly: Anomaly object from AnomalyDetector.
+            store_id: The store where the anomaly was detected.
+        """
+        assert self._conn is not None, "Database not connected"
+
+        await self._conn.execute(
+            """
+            INSERT INTO anomalies
+                (anomaly_id, store_id, anomaly_type, severity, detected_at, description, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                store_id,
+                anomaly.anomaly_type,
+                anomaly.severity,
+                anomaly.detected_at.isoformat(),
+                anomaly.description,
+                json.dumps(anomaly.metadata),
+            ),
+        )
+        await self._conn.commit()
+        logger.debug("Anomaly inserted: %s", anomaly.anomaly_type)
