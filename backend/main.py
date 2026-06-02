@@ -14,6 +14,7 @@ from fastapi import FastAPI
 
 from detection.demo_source import DemoVideoSource
 from detection.pipeline import DetectionPipeline
+from engine.event_engine import EventEngine
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,47 @@ def _build_pipeline_config() -> dict:
             "hsv_lower": [140, 50, 50],
             "hsv_upper": [170, 255, 255],
             "threshold": 0.15,
+        },
+    }
+
+
+def _build_store_layout() -> dict:
+    """Build store layout from environment or defaults.
+
+    In production, this is loaded from the database (Phase 5).
+    For now, use a default layout based on the Purplle store CAM3 entrance.
+    """
+    return {
+        "store_id": os.environ.get("STORE_ID", "purplle-brigade-road"),
+        "entry_zone": {
+            "polygon": [(0.0, 0.3), (0.2, 0.3), (0.2, 0.7), (0.0, 0.7)],
+        },
+        "exit_zone": {
+            "polygon": [(0.8, 0.3), (1.0, 0.3), (1.0, 0.7), (0.8, 0.7)],
+        },
+        "zones": [
+            {
+                "zone_id": "ZONE_MAYBELLINE",
+                "polygon": [(0.2, 0.0), (0.5, 0.0), (0.5, 0.4), (0.2, 0.4)],
+            },
+            {
+                "zone_id": "ZONE_LAKME",
+                "polygon": [(0.5, 0.0), (0.8, 0.0), (0.8, 0.4), (0.5, 0.4)],
+            },
+            {
+                "zone_id": "ZONE_SKINCARE",
+                "polygon": [(0.2, 0.6), (0.8, 0.6), (0.8, 1.0), (0.2, 1.0)],
+            },
+        ],
+        "queue_zone": {
+            "zone_id": "ZONE_QUEUE",
+            "polygon": [(0.6, 0.4), (0.8, 0.4), (0.8, 0.6), (0.6, 0.6)],
+        },
+        "adjacency_map": {
+            "ZONE_MAYBELLINE": ["ZONE_LAKME"],
+            "ZONE_LAKME": ["ZONE_MAYBELLINE", "ZONE_QUEUE"],
+            "ZONE_SKINCARE": [],
+            "ZONE_QUEUE": ["ZONE_LAKME"],
         },
     }
 
@@ -91,12 +133,27 @@ async def lifespan(app: FastAPI):
         )
         app.state.pipeline_task = None
 
+    # --- EventEngine ---
+    engine_task: asyncio.Task | None = None
+    store_layout = _build_store_layout()
+    engine = EventEngine(track_queue, event_queue, store_layout)
+    engine_task = asyncio.create_task(engine.run())
+    app.state.engine_task = engine_task
+    logger.info("EventEngine started")
+
     logger.info("ReIntellect backend ready")
 
     yield  # Application runs here
 
     # --- Shutdown ---
     logger.info("ReIntellect backend shutting down")
+
+    if engine_task is not None and not engine_task.done():
+        engine_task.cancel()
+        try:
+            await engine_task
+        except asyncio.CancelledError:
+            logger.info("EventEngine task cancelled")
 
     if pipeline_task is not None and not pipeline_task.done():
         pipeline_task.cancel()
