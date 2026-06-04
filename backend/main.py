@@ -157,7 +157,7 @@ async def lifespan(app: FastAPI):
 
     # --- EventEngine ---
     store_layout = _build_store_layout()
-    engine = EventEngine(track_queue, event_queue, store_layout)
+    engine = EventEngine(track_queue, event_queue, store_layout, db=db)
     engine_task = asyncio.create_task(engine.run())
     app.state.engine_task = engine_task
     logger.info("EventEngine started")

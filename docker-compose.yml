@@ -1,32 +1,79 @@
 services:
+
+  # ── db-init ──────────────────────────────────────────────────────────
+  # Runs once: creates schema and seeds the demo store layout.
+  # The backend waits for this to complete before starting.
   db-init:
-    build: ./backend
-    command: python -m db.init_schema
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      sh -c "python -m db.init_schema && python -m db.seed_demo_data"
     volumes:
       - reintellect_db:/data
+    environment:
+      - DB_PATH=/data/reintellect.db
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /data/reintellect.db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
+  # ── backend ──────────────────────────────────────────────────────────
+  # FastAPI application: detection pipeline, event engine, REST APIs, WebSocket.
   backend:
-    build: ./backend
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --log-level info
     ports:
       - "8000:8000"
     volumes:
       - reintellect_db:/data
+      - ./resources:/resources:ro
+    environment:
+      - DB_PATH=/data/reintellect.db
+      - VIDEO_SOURCE=${VIDEO_SOURCE:-/resources/CAM 1.mp4}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - STORE_TIMEZONE=${STORE_TIMEZONE:-Asia/Kolkata}
+      - FRONTEND_ORIGIN=http://localhost:3000
     env_file:
       - .env
     depends_on:
       db-init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    restart: on-failure
 
+  # ── frontend ─────────────────────────────────────────────────────────
+  # React SPA served by nginx; proxies /api and /ws to the backend.
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
+        - VITE_WS_BASE_URL=${VITE_WS_BASE_URL:-}
     ports:
       - "3000:80"
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    restart: on-failure
 
 volumes:
   reintellect_db:

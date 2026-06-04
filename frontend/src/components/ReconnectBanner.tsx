@@ -1,67 +1,21 @@
-/**
- * WebSocket reconnect indicator — dark themed.
- */
-
 import { theme } from "../styles/theme";
 import { useWebSocketStore } from "../store/websocket";
 
 export function ReconnectBanner() {
-  const connectionStatus = useWebSocketStore((s) => s.connectionStatus);
-  const connect = useWebSocketStore((s) => s.connect);
+  const connectionStatus = useWebSocketStore(s => s.connectionStatus);
+  const connect = useWebSocketStore(s => s.connect);
 
   if (connectionStatus === "connected") return null;
-
   const isReconnecting = connectionStatus === "reconnecting";
 
   return (
-    <div
-      role="alert"
-      style={{
-        padding: "0.5rem 1.25rem",
-        background: isReconnecting ? "#292524" : "#1c1917",
-        borderBottom: `1px solid ${isReconnecting ? theme.accent.amber : theme.accent.red}`,
-        display: "flex",
-        alignItems: "center",
-        gap: "0.75rem",
-        fontSize: "0.78rem",
-      }}
-    >
-      <div
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: isReconnecting ? theme.accent.amber : theme.accent.red,
-          animation: isReconnecting ? "pulse 1s infinite" : undefined,
-        }}
-      />
-
-      {isReconnecting && (
-        <span style={{ color: theme.accent.amber }}>Reconnecting to live feed...</span>
-      )}
-
+    <div role="alert" style={{ padding: "0.4rem 1.25rem", background: isReconnecting ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)", borderBottom: `1px solid ${isReconnecting ? "rgba(245,158,11,0.2)" : "rgba(239,68,68,0.2)"}`, display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.78rem" }}>
+      <div style={{ width: 7, height: 7, borderRadius: "50%", background: isReconnecting ? theme.accent.amber : theme.accent.red, animation: "pulse 1s infinite" }} />
+      {isReconnecting && <span style={{ color: theme.accent.amber }}>Reconnecting to live feed...</span>}
       {connectionStatus === "failed" && (
         <>
-          <span style={{ color: theme.accent.red }}>Connection lost. Live updates paused.</span>
-          <button
-            onClick={() => {
-              const sel = document.querySelector<HTMLSelectElement>('select[aria-label="Select store"]');
-              if (sel?.value) connect(sel.value);
-            }}
-            style={{
-              marginLeft: "auto",
-              padding: "0.3rem 0.75rem",
-              borderRadius: theme.radiusSm,
-              border: `1px solid ${theme.accent.red}`,
-              background: "transparent",
-              color: theme.accent.red,
-              cursor: "pointer",
-              fontSize: "0.72rem",
-              fontWeight: 600,
-            }}
-          >
-            Retry
-          </button>
+          <span style={{ color: theme.accent.red }}>Connection lost.</span>
+          <button onClick={() => { const s = document.querySelector<HTMLSelectElement>('select[aria-label="Select store"]'); if (s?.value) connect(s.value); }} style={{ marginLeft: "auto", padding: "0.25rem 0.65rem", borderRadius: theme.radiusXs, border: `1px solid ${theme.accent.red}`, background: "transparent", color: theme.accent.red, cursor: "pointer", fontSize: "0.72rem", fontWeight: 600 }}>Retry</button>
         </>
       )}
     </div>
