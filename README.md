@@ -2,7 +2,12 @@
 
 **Transform retail CCTV footage into real-time business intelligence.**
 
-![Demo](docs/Demo.gif)
+
+
+https://github.com/user-attachments/assets/a26a3b72-501d-4c7a-8172-154f8efbf80c
+
+
+
 
 AI-Powered Retail Intelligence Platform
 
