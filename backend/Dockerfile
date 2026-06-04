@@ -6,7 +6,7 @@ FROM python:3.11-slim
 # Install system dependencies needed by OpenCV and curl (for healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
