@@ -2,6 +2,10 @@
 
 **Transform retail CCTV footage into real-time business intelligence.**
 
+![Demo](docs/Demo.gif)
+
+AI-Powered Retail Intelligence Platform
+
 > Built for the Purplle Tech Challenge 2026
 
 ---
@@ -112,16 +116,53 @@ The result: a live command center that shows visitor journeys, heatmaps, convers
 
 ## Demo Screenshots
 
-> *Screenshots from the Purplle Brigade Road demo deployment*
+# ReIntellect
+
+![Demo](docs/Demo.gif)
+
+AI-Powered Retail Intelligence Platform
 
 | Screen | Description |
 |---|---|
-| `[Landing Page]` | Premium product showcase with live camera feed preview |
-| `[Overview Dashboard]` | KPI cards, store floor map, hourly traffic chart |
-| `[Funnel Analytics]` | Visitor conversion stages with drop-off rates |
-| `[Heatmap]` | Real store layout with density overlay |
-| `[Anomaly Detection]` | SOC-style anomaly cards with recommended actions |
+## Demo Screenshots
 
+### Landing Page
+
+![Landing Page](docs/screenshots/landing-page.png)
+
+Premium product showcase with live camera feed preview.
+
+---
+
+### Dashboard Overview
+
+![Dashboard](docs/screenshots/dashboard-overview.png)
+
+KPI cards, store intelligence map, and live activity feed.
+
+---
+
+### Funnel Analytics
+
+![Funnel](docs/screenshots/funnel.png)
+
+Visitor conversion stages and drop-off analysis.
+
+---
+
+### Heatmap
+
+![Heatmap](docs/screenshots/heatmap.png)
+
+Real store layout with density overlay.
+
+---
+
+### Anomaly Detection
+
+![Anomalies](docs/screenshots/anomalies.png)
+
+SOC-style anomaly monitoring and recommendations.
 ---
 
 ## Quick Start (Docker)
