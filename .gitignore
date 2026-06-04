@@ -16,7 +16,9 @@ htmlcov/
 venv/
 
 # Environment variables
+.env.example
 .env
+.env.local
 
 # Databases
 *.db
