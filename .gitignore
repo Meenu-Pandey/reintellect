@@ -45,3 +45,5 @@ Thumbs.db
 resources/*.mp4
 resources/*.avi
 resources/*.mov
+
+.kiro/
