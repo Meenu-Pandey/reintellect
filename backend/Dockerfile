@@ -33,7 +33,8 @@ RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir \
     httpx==0.27.* \
     opencv-python-headless==4.9.* \
     "torch>=2.2,<3" \
-    shapely==2.0.*
+    shapely==2.0.*\
+    "lapx>=0.5.2"
 
 # Copy application source
 COPY . .
